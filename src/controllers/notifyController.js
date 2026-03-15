@@ -6,7 +6,7 @@ import Notification from '../models/Notification.js';
 export const sendNotification = async (req, res) => {
   try {
     const { message } = req.body;
-    
+
     if (!message) {
       return res.status(400).json({ message: 'Mesaj alanı gereklidir' });
     }
@@ -34,7 +34,7 @@ export const sendNotification = async (req, res) => {
 export const listNotifications = async (req, res) => {
   try {
     const userId = req.user ? req.user._id : null;
-    
+
     // Fetch user specific and global notifications
     const notifications = await Notification.find({
       $or: [
@@ -62,7 +62,7 @@ export const listNotifications = async (req, res) => {
 export const markNotificationRead = async (req, res) => {
   try {
     const notification = await Notification.findById(req.params.notifId);
-    
+
     if (!notification) {
       return res.status(404).json({ message: 'Bildirim bulunamadı' });
     }
@@ -86,7 +86,7 @@ export const markNotificationRead = async (req, res) => {
 export const deleteNotification = async (req, res) => {
   try {
     const notification = await Notification.findById(req.params.notifId);
-    
+
     if (!notification) {
       return res.status(404).json({ message: 'Bildirim bulunamadı' });
     }

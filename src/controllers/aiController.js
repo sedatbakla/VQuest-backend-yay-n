@@ -9,7 +9,7 @@ import { generateAnalysis } from '../services/geminiServices.js';
 export const startAnalysis = async (req, res) => {
   try {
     const userId = req.user ? req.user._id : 'dummy-user-id'; // Fallback for testing without auth
-    
+
     // In a real app, you would aggregate user's stats from DB
     // Here we'll simulate some stats for the API scope
     const userStats = {
@@ -45,7 +45,7 @@ export const startAnalysis = async (req, res) => {
 export const getReport = async (req, res) => {
   try {
     const report = await Analysis.findById(req.params.reportId);
-    
+
     if (!report) {
       return res.status(404).json({ message: 'Rapor bulunamadı' });
     }
@@ -65,7 +65,7 @@ export const getReport = async (req, res) => {
 export const deleteReport = async (req, res) => {
   try {
     const report = await Analysis.findById(req.params.reportId);
-    
+
     if (!report) {
       return res.status(404).json({ message: 'Rapor bulunamadı' });
     }
@@ -84,13 +84,13 @@ export const deleteReport = async (req, res) => {
 export const updateAiPrompt = async (req, res) => {
   try {
     const { promptText } = req.body;
-    
+
     if (!promptText) {
       return res.status(400).json({ message: 'promptText gereklidir' });
     }
 
     let config = await SystemConfig.findOne({ key: 'AI_PROMPT' });
-    
+
     if (config) {
       config.value = promptText;
       await config.save();

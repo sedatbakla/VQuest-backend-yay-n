@@ -1,10 +1,10 @@
 import 'dotenv/config';
 import express from 'express';
 import mongoose from 'mongoose';
-import connectDB from './config/db.js';
+import connectDB from './src/config/db.js';
 
-import aiRoutes from './routes/aiRoutes.js';
-import notifyRoutes from './routes/notifyRoutes.js';
+import aiRoutes from './src/routes/aiRoutes.js';
+import notifyRoutes from './src/routes/notifyRoutes.js';
 
 const app = express();
 connectDB();
