@@ -1,28 +1,28 @@
 import 'dotenv/config';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_KEY });
+// 1. API'yi başlatıyoruz
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY);
+// 2. Modeli seçiyoruz (1.5-flash şu an en mantıklı olanı)
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 /**
  * Generate analysis report using Gemini API.
- * 
- * @param {Object} userData - User performance data (e.g. correct/wrong answers, time).
- * @param {String} systemPrompt - Prompt retrieved from SystemConfig (or default).
- * @returns {String} - Generated analysis text.
  */
 export const generateAnalysis = async (userData, systemPrompt) => {
   try {
     const defaultPrompt = 'Sen bir yapay zeka analizörüsün. Kullanıcının yarışma verilerine bakarak analiz ve tavsiyeler üret.';
     const finalPrompt = systemPrompt || defaultPrompt;
-    
-    const userContext = `Kullanıcı Verileri:\n${JSON.stringify(userData, null, 2)}`;
-    
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: `${finalPrompt}\n\n${userContext}`,
-    });
 
-    return response.text;
+    const userContext = `Kullanıcı Verileri:\n${JSON.stringify(userData, null, 2)}`;
+
+    // 3. BURASI DEĞİŞTİ: Doğrudan model üzerinden çağırıyoruz
+    const result = await model.generateContent(`${finalPrompt}\n\n${userContext}`);
+
+    // 4. BURASI DEĞİŞTİ: Yanıtı metne çeviriyoruz
+    const response = await result.response;
+    return response.text();
+
   } catch (error) {
     console.error('Gemini API Error:', error);
     throw new Error('Yapay zeka analiz oluştururken bir hata meydana geldi.');
