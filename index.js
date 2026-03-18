@@ -12,6 +12,8 @@ import questionRoutes from './src/routes/questionRoutes.js';
 import authRoutes from './src/routes/authRoutes.js';
 import profileRoutes from './src/routes/profileRoutes.js';
 import userRoutes from './src/routes/userRoutes.js';
+import packageRoutes from './src/routes/packageRoutes.js';
+import suggestionRoutes from './src/routes/suggestionRoutes.js';
 
 const app = express();
 connectDB();
@@ -38,6 +40,8 @@ app.use('/api', questionRoutes);
 app.use('/api', authRoutes);
 app.use('/api', profileRoutes);
 app.use('/api', userRoutes);
+app.use('/api', packageRoutes);
+app.use('/api', suggestionRoutes);
 
 // Start the server
 app.listen(port, () => {
