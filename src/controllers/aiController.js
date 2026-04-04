@@ -24,11 +24,29 @@ export const startAnalysis = async (req, res) => {
       totalQuestions: performanceData?.length || 0,
       timestamp: new Date().toISOString()
     };
+    
+    console.log('--- AI Analysis Start ---');
+    console.log('User Stats:', JSON.stringify(userStats));
 
     let systemPromptConfig = await SystemConfig.findOne({ key: 'AI_PROMPT' });
-    let promptText = systemPromptConfig ? systemPromptConfig.value : 'Kullanıcının bu oyundaki performansını analiz et ve çok kısa (1-2 cümle) tavsiye ver. Türkçe cevap ver.';
+    let promptText = systemPromptConfig ? systemPromptConfig.value : 'Kullanıcının bu oyundaki performansını analiz et ve SADECE 1 CÜMLELİK kısa bir tavsiye veya geri bildirim ver. Başka hiçbir şey yazma. Türkçe cevap ver.';
 
-    const analysisText = await generateAnalysis(userStats, promptText);
+    const finalPrompt = promptText + "\nDİKKAT KATI KURAL: Vereceğin yanıt istisnasız SADECE VE SADECE 1 CÜMLE olacaktır. Ne olursa olsun ikinci bir cümleye geçme!";
+    console.log('Final Prompt:', finalPrompt);
+
+    let analysisText;
+    try {
+      // 30 saniye timeout ekleyelim
+      const analysisPromise = generateAnalysis(userStats, finalPrompt);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('AI timeout')), 30000)
+      );
+      analysisText = await Promise.race([analysisPromise, timeoutPromise]);
+      console.log('AI Analysis Result:', analysisText);
+    } catch (aiErr) {
+      console.error('AI Error during generation:', aiErr);
+      return res.status(400).json({ message: 'Analiz oluşturulamadı' });
+    }
 
     const newAnalysis = await Analysis.create({
       userId,
@@ -41,6 +59,7 @@ export const startAnalysis = async (req, res) => {
     });
 
   } catch (error) {
+    console.error('General AI Controller Error:', error);
     res.status(400).json({ message: error.message || 'Analiz başlatılamadı' });
   }
 };

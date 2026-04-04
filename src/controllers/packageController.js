@@ -1,5 +1,6 @@
 import Package from '../models/Package.js';
 import Question from '../models/Question.js';
+import mongoose from 'mongoose';
 
 // @desc    Soru Paketi Oluşturma (Birleşik Akış)
 // @route   POST /api/packages

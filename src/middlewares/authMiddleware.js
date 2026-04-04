@@ -25,6 +25,7 @@ export const authMiddleware = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
+    console.error('Jwt Verify Error:', error.message);
     return res.status(401).json({ message: 'Geçersiz veya süresi dolmuş token' });
   }
 };

@@ -1,5 +1,6 @@
 import express from 'express';
 import { startAnalysis, getReport, deleteReport, updateAiPrompt } from '../controllers/aiController.js';
+import { authMiddleware, adminMiddleware } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
@@ -16,6 +17,8 @@ const router = express.Router();
  *   post:
  *     summary: Kişisel analiz başlat
  *     tags: [AI]
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       202:
  *         description: Analiz oluşturuldu
@@ -30,7 +33,7 @@ const router = express.Router();
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/ai/analysis', startAnalysis);
+router.post('/ai/analysis', authMiddleware, startAnalysis);
 
 /**
  * @swagger
@@ -78,8 +81,8 @@ router.post('/ai/analysis', startAnalysis);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.get('/ai/reports/:reportId', getReport);
-router.delete('/ai/reports/:reportId', deleteReport);
+router.get('/ai/reports/:reportId', authMiddleware, getReport);
+router.delete('/ai/reports/:reportId', authMiddleware, deleteReport);
 
 /**
  * @swagger
@@ -119,7 +122,7 @@ router.delete('/ai/reports/:reportId', deleteReport);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.put('/admin/ai/prompt', updateAiPrompt);
+router.put('/admin/ai/prompt', authMiddleware, adminMiddleware, updateAiPrompt);
 
 export default router;
 

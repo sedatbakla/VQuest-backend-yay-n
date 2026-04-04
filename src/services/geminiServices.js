@@ -17,11 +17,14 @@ export const generateAnalysis = async (userData, systemPrompt) => {
     const userContext = `Kullanıcı Verileri:\n${JSON.stringify(userData, null, 2)}`;
 
     // 3. BURASI DEĞİŞTİ: Doğrudan model üzerinden çağırıyoruz
+    console.log('Sending to Gemini...');
     const result = await model.generateContent(`${finalPrompt}\n\n${userContext}`);
 
     // 4. BURASI DEĞİŞTİ: Yanıtı metne çeviriyoruz
     const response = await result.response;
-    return response.text();
+    const text = response.text();
+    console.log('Gemini Result Text:', text);
+    return text;
 
   } catch (error) {
     console.error('Gemini API Error:', error);
