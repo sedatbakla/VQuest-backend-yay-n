@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   app:
     build: .
@@ -9,10 +7,9 @@ services:
       - "3000:3000"
     environment:
       - PORT=3000
-      - MONGODB_URI=mongodb://mongo:27017/vquest
+      - MONGO_URI=mongodb://mongo:27017/vquest
+      - JWT_SECRET=vquest_super_secret_key_12345!@#
       - NODE_ENV=development
-    env_file:
-      - .env
     volumes:
       - .:/usr/src/app
       - /usr/src/app/node_modules

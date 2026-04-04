@@ -1,5 +1,5 @@
 import express from 'express';
-import { startAnalysis, getReport, deleteReport, updateAiPrompt } from '../controllers/aiController.js';
+import { startAnalysis, getReport, deleteReport, updateAiPrompt, getAiPrompt } from '../controllers/aiController.js';
 import { authMiddleware, adminMiddleware } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
@@ -122,6 +122,7 @@ router.delete('/ai/reports/:reportId', authMiddleware, deleteReport);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
+router.get('/admin/ai/prompt', authMiddleware, adminMiddleware, getAiPrompt);
 router.put('/admin/ai/prompt', authMiddleware, adminMiddleware, updateAiPrompt);
 
 export default router;
