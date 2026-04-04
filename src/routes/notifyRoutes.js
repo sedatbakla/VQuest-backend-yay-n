@@ -1,5 +1,6 @@
 import express from 'express';
 import { sendNotification, listNotifications, markNotificationRead, deleteNotification } from '../controllers/notifyController.js';
+import { authMiddleware, adminMiddleware } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
@@ -44,7 +45,7 @@ const router = express.Router();
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/admin/notifications', sendNotification);
+router.post('/admin/notifications', authMiddleware, adminMiddleware, sendNotification);
 
 /**
  * @swagger
@@ -62,7 +63,7 @@ router.post('/admin/notifications', sendNotification);
  *               items:
  *                 $ref: '#/components/schemas/Notification'
  */
-router.get('/notifications', listNotifications);
+router.get('/notifications', authMiddleware, listNotifications);
 
 /**
  * @swagger
@@ -91,7 +92,7 @@ router.get('/notifications', listNotifications);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.put('/notifications/:notifId/read', markNotificationRead);
+router.put('/notifications/:notifId/read', authMiddleware, markNotificationRead);
 
 /**
  * @swagger
@@ -116,7 +117,7 @@ router.put('/notifications/:notifId/read', markNotificationRead);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.delete('/notifications/:notifId', deleteNotification);
+router.delete('/notifications/:notifId', authMiddleware, deleteNotification);
 
 export default router;
 

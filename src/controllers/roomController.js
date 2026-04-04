@@ -1,5 +1,6 @@
 import Room from '../models/Room.js';
 import Question from '../models/Question.js';
+import Package from '../models/Package.js';
 import mongoose from 'mongoose';
 import { getIO } from '../services/socketService.js';
 
@@ -19,13 +20,12 @@ export const createRoom = async (req, res) => {
     // 1. Özel Soru oluşturulduysa (sourceType: 'custom' durumu)
     if (newQuestions && Array.isArray(newQuestions) && newQuestions.length > 0) {
       const created = await Promise.all(newQuestions.map(q => 
-        Question.create({ ...q, category: 'Özel Yarışma', isPrivate: true, creator: hostId })
+        Question.create({ ...q, category: name || 'Özel Yarışma', isPrivate: true, creator: hostId })
       ));
       questionIds = created.map(q => q._id);
     } 
     // 2. Hazır Soru Paketinden al
     else if (packageId) {
-      const Package = mongoose.model('Package');
       const pkg = await Package.findById(packageId);
       if (pkg) questionIds = pkg.questions;
     } 

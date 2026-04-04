@@ -3,6 +3,19 @@ import Notification from '../models/Notification.js';
 import SystemConfig from '../models/SystemConfig.js';
 import { generateAnalysis } from '../services/geminiServices.js';
 
+// @desc    Mevcut AI Promptu Getir
+// @route   GET /api/admin/ai/prompt
+// @access  Private/Admin
+export const getAiPrompt = async (req, res) => {
+  try {
+    const config = await SystemConfig.findOne({ key: 'AI_PROMPT' });
+    const promptText = config ? config.value : 'Kullanıcının bu oyundaki performansını analiz et ve SADECE 1 CÜMLELİK kısa bir tavsiye veya geri bildirim ver. Başka hiçbir şey yazma. Türkçe cevap ver.';
+    res.status(200).json({ promptText });
+  } catch (error) {
+    res.status(500).json({ message: 'Prompt alınamadı' });
+  }
+};
+
 // @desc    Kişisel Analiz Başlatma
 // @route   POST /api/ai/analysis
 // @access  Private

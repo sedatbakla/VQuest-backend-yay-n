@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "target": "ES6",
+    "module": "ESNext",
+    "forceConsistentCasingInFileNames": false
+  },
+  "exclude": ["node_modules"]
+}

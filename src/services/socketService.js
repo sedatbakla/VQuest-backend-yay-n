@@ -41,6 +41,11 @@ export const initSocket = (server) => {
       io.to(roomId).emit('gameStarted');
     });
 
+    // Sonraki Soruya Geç (Host tetikler, tüm odaya yayınlanır)
+    socket.on('nextQuestion', ({ roomId, questionIndex }) => {
+      io.to(roomId).emit('nextQuestion', { questionIndex });
+    });
+
     // Soru Cevaplama ve Skor Güncelleme
     socket.on('submitAnswer', async ({ roomId, userId, isCorrect, score }) => {
       try {
