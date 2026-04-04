@@ -1,6 +1,6 @@
 import express from 'express';
 import { createPackage, listPackages, updatePackage, deletePackage } from '../controllers/packageController.js';
-import { authMiddleware } from '../middlewares/authMiddleware.js';
+import { authMiddleware, adminMiddleware } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
@@ -44,7 +44,7 @@ const router = express.Router();
  *       401:
  *         description: Kimlik doğrulama başarısız
  */
-router.post('/packages', authMiddleware, createPackage);
+router.post('/packages', authMiddleware, adminMiddleware, createPackage);
 
 /**
  * @swagger
@@ -102,7 +102,7 @@ router.get('/packages', authMiddleware, listPackages);
  *       404:
  *         description: Paket bulunamadı
  */
-router.put('/packages/:packageId', authMiddleware, updatePackage);
+router.put('/packages/:packageId', authMiddleware, adminMiddleware, updatePackage);
 
 /**
  * @swagger
@@ -127,6 +127,6 @@ router.put('/packages/:packageId', authMiddleware, updatePackage);
  *       404:
  *         description: Paket bulunamadı
  */
-router.delete('/packages/:packageId', authMiddleware, deletePackage);
+router.delete('/packages/:packageId', authMiddleware, adminMiddleware, deletePackage);
 
 export default router;

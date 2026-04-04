@@ -1,23 +1,34 @@
 import Package from '../models/Package.js';
+import Question from '../models/Question.js';
 
-// @desc    Soru Paketi Oluşturma
+// @desc    Soru Paketi Oluşturma (Birleşik Akış)
 // @route   POST /api/packages
-// @access  Private (Madde 23)
+// @access  Private
 export const createPackage = async (req, res) => {
   try {
-    const { title, description, isPublic, questions } = req.body;
+    const { title, description, isPublic, questions, newQuestions } = req.body;
+
+    let questionIds = questions || [];
+
+    // Yeni Soruları oluştur ve ID'lerini al
+    if (newQuestions && Array.isArray(newQuestions) && newQuestions.length > 0) {
+      const created = await Promise.all(newQuestions.map(q => 
+        Question.create({ ...q, creator: req.user._id, isPrivate: false })
+      ));
+      questionIds = [...questionIds, ...created.map(q => q._id)];
+    }
 
     const newPackage = await Package.create({
       title,
       description,
       isPublic,
-      questions: questions || [],
+      questions: questionIds,
       creator: req.user._id,
     });
 
     res.status(201).json(newPackage);
   } catch (error) {
-    res.status(400).json({ message: 'Geçersiz veri: Paket oluşturulamadı', error: error.message });
+    res.status(400).json({ message: 'Paket oluşturulamadı', error: error.message });
   }
 };
 
@@ -28,14 +39,26 @@ export const listPackages = async (req, res) => {
   try {
     let query = {};
     if (req.user.role !== 'admin') {
-      // Normal kullanıcılar sadece genel paketleri veya kendi oluşturduklarını görebilir
-      query = { $or: [{ isPublic: true }, { creator: req.user._id }] };
+      // Kullanıcılar sadece adminlerin oluşturduğu paketleri görebilsin (Hazır Paket mantığı)
+      // Önce adminlerin ID'lerini bulalım veya doğrudan creator role üzerinden gidelim
+      const User = mongoose.model('User');
+      const admins = await User.find({ role: 'admin' }).select('_id');
+      const adminIds = admins.map(a => a._id);
+      
+      query = { 
+        $or: [
+          { creator: { $in: adminIds } },
+          { isPublic: true }
+        ]
+      };
     }
     
-    const packages = await Package.find(query).populate('creator', 'username').sort({ createdAt: -1 });
+    const packages = await Package.find(query)
+      .populate('creator', 'username role')
+      .populate('questions');
     res.status(200).json(packages);
   } catch (error) {
-    res.status(400).json({ message: 'Paketler listelenemedi', error: error.message });
+    res.status(400).json({ message: error.message });
   }
 };
 

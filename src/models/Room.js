@@ -22,6 +22,10 @@ const roomSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  category: {
+    type: String,
+    default: 'Genel Kültür'
+  },
   maxParticipants: {
     type: Number,
     default: 10
@@ -35,9 +39,30 @@ const roomSchema = new mongoose.Schema({
     enum: ['active', 'closed'],
     default: 'active'
   },
+  isPublic: {
+    type: Boolean,
+    default: true
+  },
+  joinCode: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
+  isStarted: {
+    type: Boolean,
+    default: false
+  },
   participants: {
     type: [participantSchema],
     default: []
+  },
+  questions: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Question'
+  }],
+  packageId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Package'
   }
 }, { timestamps: true, versionKey: false });
 

@@ -27,7 +27,7 @@ const router = express.Router();
  *               items:
  *                 $ref: '#/components/schemas/Question'
  */
-router.get('/questions', listQuestions);
+router.get('/questions', authMiddleware, listQuestions);
 
 /**
  * @swagger

@@ -11,7 +11,8 @@ services:
       - PORT=3000
       - MONGODB_URI=mongodb://mongo:27017/vquest
       - NODE_ENV=development
-      - GEMINI_KEY=${GEMINI_KEY}
+    env_file:
+      - .env
     volumes:
       - .:/usr/src/app
       - /usr/src/app/node_modules

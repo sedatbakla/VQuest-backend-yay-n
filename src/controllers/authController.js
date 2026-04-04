@@ -68,7 +68,16 @@ export const login = async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    res.status(200).json({ token });
+    res.status(200).json({ 
+      token, 
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        score: user.score
+      } 
+    });
   } catch (error) {
     res.status(400).json({ message: error.message || 'Giriş başarısız' });
   }

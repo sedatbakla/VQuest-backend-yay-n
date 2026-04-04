@@ -8,19 +8,25 @@ import { generateAnalysis } from '../services/geminiServices.js';
 // @access  Private
 export const startAnalysis = async (req, res) => {
   try {
-    const userId = req.user ? req.user._id : 'dummy-user-id'; // Fallback for testing without auth
+    const userId = req.user ? req.user._id : null;
+    const { performanceData } = req.body; // Array of { category, isCorrect }
 
-    // In a real app, you would aggregate user's stats from DB
-    // Here we'll simulate some stats for the API scope
+    // Aggregate performance by category
+    const stats = performanceData ? performanceData.reduce((acc, curr) => {
+      if (!acc[curr.category]) acc[curr.category] = { correct: 0, total: 0 };
+      acc[curr.category].total += 1;
+      if (curr.isCorrect) acc[curr.category].correct += 1;
+      return acc;
+    }, {}) : {};
+
     const userStats = {
-      playedCategories: ['Yazılım Geliştirme', 'Tarih'],
-      correctPercentage: 75,
-      averageResponseTime: '12s',
-      lastCompetitions: 5
+      performance: stats,
+      totalQuestions: performanceData?.length || 0,
+      timestamp: new Date().toISOString()
     };
 
     let systemPromptConfig = await SystemConfig.findOne({ key: 'AI_PROMPT' });
-    let promptText = systemPromptConfig ? systemPromptConfig.value : '';
+    let promptText = systemPromptConfig ? systemPromptConfig.value : 'Kullanıcının bu oyundaki performansını analiz et ve çok kısa (1-2 cümle) tavsiye ver. Türkçe cevap ver.';
 
     const analysisText = await generateAnalysis(userStats, promptText);
 

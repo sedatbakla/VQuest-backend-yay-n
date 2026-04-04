@@ -7,7 +7,10 @@ import {
   updateRoomSettings,
   getLeaderboard,
   kickParticipant,
-  closeRoom
+  closeRoom,
+  joinByCode,
+  startRoom,
+  getRoomById
 } from '../controllers/roomController.js';
 import { authMiddleware } from '../middlewares/authMiddleware.js';
 
@@ -18,6 +21,11 @@ router.post('/rooms', authMiddleware, createRoom);
 
 // Madde 19 - Oda Listeleme
 router.get('/rooms', authMiddleware, listRooms);
+router.get('/rooms/:roomId', authMiddleware, getRoomById);
+
+// Yeni - Kodla Katılma & Başlatma
+router.post('/rooms/join-code', authMiddleware, joinByCode);
+router.post('/rooms/:roomId/start', authMiddleware, startRoom);
 
 // Madde 16 - Cevap Gönderme
 router.post('/rooms/:roomId/answers', authMiddleware, submitAnswer);

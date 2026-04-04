@@ -12,7 +12,19 @@ const questionSchema = new mongoose.Schema({
   correctAnswer: {
     type: String,
     required: true
+  },
+  category: {
+    type: String,
+    default: 'Genel Kültür'
+  },
+  isPrivate: {
+    type: Boolean,
+    default: false
+  },
+  creator: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   }
-}, { versionKey: false });
+}, { timestamps: true, versionKey: false });
 
 export default mongoose.model('Question', questionSchema);
