@@ -16,24 +16,29 @@ export const createRoom = async (req, res) => {
 
     let questionIds = [];
     
-    // 1. Inline Soruları oluştur
+    // 1. Özel Soru oluşturulduysa (sourceType: 'custom' durumu)
     if (newQuestions && Array.isArray(newQuestions) && newQuestions.length > 0) {
       const created = await Promise.all(newQuestions.map(q => 
-        Question.create({ ...q, category: category || 'Özel', isPrivate: true, creator: hostId })
+        Question.create({ ...q, category: 'Özel Yarışma', isPrivate: true, creator: hostId })
       ));
       questionIds = created.map(q => q._id);
     } 
-    // 2. Paket seçildiyse paketten al
+    // 2. Hazır Soru Paketinden al
     else if (packageId) {
       const Package = mongoose.model('Package');
       const pkg = await Package.findById(packageId);
       if (pkg) questionIds = pkg.questions;
     } 
-    // 3. Kategori seçildiyse kategoriden al
-    else {
-      const categoryQuery = category ? { category, isPrivate: { $ne: true } } : { isPrivate: { $ne: true } };
-      const questions = await Question.find(categoryQuery).limit(10);
+    // 3. Kategoriden (Hazır Paket Mantığı) al
+    else if (category) {
+      const questions = await Question.find({ category, isPrivate: { $ne: true } });
       questionIds = questions.map(q => q._id);
+    }
+
+    if (questionIds.length === 0) {
+       // Hiç soru bulunamadıysa varsayılan 10 tane genel soru ekleyelim
+       const fallback = await Question.find({ isPrivate: { $ne: true } }).limit(10);
+       questionIds = fallback.map(q => q._id);
     }
 
     // Join Code oluştur (6 hane rastgele)

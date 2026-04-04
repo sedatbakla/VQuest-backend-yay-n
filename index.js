@@ -17,6 +17,7 @@ import userRoutes from './src/routes/userRoutes.js';
 import packageRoutes from './src/routes/packageRoutes.js';
 import suggestionRoutes from './src/routes/suggestionRoutes.js';
 import roomRoutes from './src/routes/roomRoutes.js';
+import adminRoutes from './src/routes/adminRoutes.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -39,6 +40,7 @@ app.get('/', (req, res) => {
 });
 
 // API Routes
+app.use('/api', adminRoutes);
 app.use('/api', aiRoutes);
 app.use('/api', notifyRoutes);
 app.use('/api', categoryRoutes);

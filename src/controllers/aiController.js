@@ -45,7 +45,14 @@ export const startAnalysis = async (req, res) => {
       console.log('AI Analysis Result:', analysisText);
     } catch (aiErr) {
       console.error('AI Error during generation:', aiErr);
-      return res.status(400).json({ message: 'Analiz oluşturulamadı' });
+      
+      // FALLBACK: AI çalışmazsa kullanıcıya boş dönmek yerine istatistiklerden basit rapor üretelim
+      const topCategory = Object.entries(stats).sort((a,b) => b[1].total - a[1].total)[0];
+      const categoryName = topCategory ? topCategory[0] : 'Genel';
+      const accuracy = topCategory ? Math.round((topCategory[1].correct / topCategory[1].total) * 100) : 0;
+      
+      analysisText = `${categoryName} kategorisindeki performansın %${accuracy} seviyesinde. ${accuracy > 70 ? 'Harika bir iş çıkardın, böyle devam et!' : 'Biraz daha pratik yaparak bu alanda kendini geliştirebilirsin.'}`;
+      console.log('Using Fallback Analysis:', analysisText);
     }
 
     const newAnalysis = await Analysis.create({

@@ -1,5 +1,5 @@
 import express from 'express';
-import { listUsers, blockUser } from '../controllers/userController.js';
+import { listUsers, toggleBlockUser } from '../controllers/userController.js';
 import { authMiddleware, adminMiddleware } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
@@ -73,6 +73,6 @@ router.get('/admin/users', authMiddleware, adminMiddleware, listUsers);
  *       404:
  *         description: Kullanıcı bulunamadı
  */
-router.put('/admin/users/:userId/block', authMiddleware, adminMiddleware, blockUser);
+router.put('/admin/users/:userId/block', authMiddleware, adminMiddleware, toggleBlockUser);
 
 export default router;

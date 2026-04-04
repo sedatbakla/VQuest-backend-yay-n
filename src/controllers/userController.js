@@ -12,28 +12,25 @@ export const listUsers = async (req, res) => {
   }
 };
 
-// @desc    Kullanıcı Engelleme
+// @desc    Kullanıcı Engelleme/Kaldırma Tıklama
 // @route   PUT /api/admin/users/:userId/block
-// @access  Private/Admin (Madde 5)
-export const blockUser = async (req, res) => {
+// @access  Private/Admin
+export const toggleBlockUser = async (req, res) => {
   try {
-    const user = await User.findByIdAndUpdate(
-      req.params.userId,
-      { isBlocked: true },
-      { new: true }
-    ).select('-password');
-
+    const user = await User.findById(req.params.userId);
     if (!user) {
       return res.status(404).json({ message: 'Kullanıcı bulunamadı' });
     }
 
+    user.isBlocked = !user.isBlocked;
+    await user.save();
+
     res.status(200).json({
       _id: user._id,
       username: user.username,
-      email: user.email,
-      score: user.score,
+      isBlocked: user.isBlocked
     });
   } catch (error) {
-    res.status(400).json({ message: 'Kullanıcı engellenemedi' });
+    res.status(400).json({ message: 'İşlem başarısız' });
   }
 };

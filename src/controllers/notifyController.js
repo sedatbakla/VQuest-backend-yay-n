@@ -1,4 +1,5 @@
 import Notification from '../models/Notification.js';
+import { getIO } from '../services/socketService.js';
 
 // @desc    Bildirim Gönderme
 // @route   POST /api/admin/notifications
@@ -11,12 +12,22 @@ export const sendNotification = async (req, res) => {
       return res.status(400).json({ message: 'Mesaj alanı gereklidir' });
     }
 
-    // Since the API schema doesn't specify userId for global vs specific, 
-    // we'll treat it as a global notification if user isn't specified, but schema says NotificationInput has only 'message'
     const notification = await Notification.create({
       message,
-      // userId is omitted here making it a global notification effectively
     });
+
+    // Socket.io ile anlık bildirim gönder (Tüm bağlı kullanıcılara)
+    try {
+      const io = getIO();
+      io.emit('newNotification', {
+        _id: notification._id,
+        message: notification.message,
+        isRead: false,
+        createdAt: notification.createdAt
+      });
+    } catch (socketErr) {
+      console.error('Socket notification emit error:', socketErr.message);
+    }
 
     res.status(201).json({
       _id: notification._id,
