@@ -10,8 +10,12 @@ const options = {
     },
     servers: [
       {
+        url: 'https://vquest-backend-api.onrender.com',
+        description: 'Production Server (Render)',
+      },
+      {
         url: 'http://localhost:3000',
-        description: 'Geliştirme Sunucusu',
+        description: 'Geliştirme Sunucusu (Local)',
       },
     ],
     components: {

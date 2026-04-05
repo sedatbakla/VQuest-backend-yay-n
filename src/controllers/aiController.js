@@ -75,7 +75,8 @@ export const startAnalysis = async (req, res) => {
 
     res.status(202).json({
       _id: newAnalysis._id,
-      analysisText: newAnalysis.analysisText
+      analysisText: newAnalysis.analysisText,
+      createdAt: newAnalysis.createdAt
     });
 
   } catch (error) {
@@ -97,7 +98,8 @@ export const getReport = async (req, res) => {
 
     res.status(200).json({
       _id: report._id,
-      analysisText: report.analysisText
+      analysisText: report.analysisText,
+      createdAt: report.createdAt
     });
   } catch (error) {
     res.status(400).json({ message: 'Rapor getirilemedi' });

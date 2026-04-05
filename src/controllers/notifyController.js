@@ -32,7 +32,8 @@ export const sendNotification = async (req, res) => {
     res.status(201).json({
       _id: notification._id,
       message: notification.message,
-      isRead: notification.isRead
+      isRead: notification.isRead,
+      createdAt: notification.createdAt
     });
   } catch (error) {
     res.status(400).json({ message: 'Bildirim gönderilemedi' });
@@ -58,7 +59,8 @@ export const listNotifications = async (req, res) => {
     const formattedNotifications = notifications.map(n => ({
       _id: n._id,
       message: n.message,
-      isRead: n.isRead
+      isRead: n.isRead,
+      createdAt: n.createdAt
     }));
 
     res.status(200).json(formattedNotifications);
@@ -84,7 +86,8 @@ export const markNotificationRead = async (req, res) => {
     res.status(200).json({
       _id: notification._id,
       message: notification.message,
-      isRead: notification.isRead
+      isRead: notification.isRead,
+      createdAt: notification.createdAt
     });
   } catch (error) {
     res.status(400).json({ message: 'Bildirim güncellenemedi' });
