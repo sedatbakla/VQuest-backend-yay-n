@@ -82,3 +82,29 @@ export const login = async (req, res) => {
     res.status(400).json({ message: error.message || 'Giriş başarısız' });
   }
 };
+
+// @desc    Admin Onarma
+// @route   GET /api/auth/fix-admin
+// @access  Public
+export const fixAdmin = async (req, res) => {
+  try {
+    let existing = await User.findOne({ email: 'admin@vquest.com' });
+    const password = await bcrypt.hash('admin123', 10);
+    if (!existing) {
+      await User.create({
+        username: 'VQuestAdmin',
+        email: 'admin@vquest.com',
+        password,
+        role: 'admin'
+      });
+      return res.status(200).json({ message: 'Admin kullanıcısı başarıyla oluşturuldu! (Email: admin@vquest.com, Şifre: admin123)' });
+    } else {
+      existing.password = password;
+      existing.role = 'admin';
+      await existing.save();
+      return res.status(200).json({ message: 'Mevcut Admin kullanıcısı güncellendi! (Email: admin@vquest.com, Şifre: admin123)' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
