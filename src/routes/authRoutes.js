@@ -1,5 +1,7 @@
 import express from 'express';
-import { register, login, fixAdmin } from '../controllers/authController.js';
+import { register, login, logout, fixAdmin } from '../controllers/authController.js';
+import { authMiddleware } from '../middlewares/authMiddleware.js';
+import { authLimiter } from '../config/rateLimiter.js'; // Brute-force koruma için rate limiter
 
 const router = express.Router();
 
@@ -56,8 +58,11 @@ router.get('/auth/fix-admin', fixAdmin);
  *                   type: integer
  *       400:
  *         description: Geçersiz istek verisi
+ *       429:
+ *         description: Çok fazla deneme — rate limit aşıldı
  */
-router.post('/auth/register', register);
+// authLimiter: 15 dakikada maks 5 kayıt isteğine izin ver
+router.post('/auth/register', authLimiter, register);
 
 /**
  * @swagger
@@ -96,7 +101,35 @@ router.post('/auth/register', register);
  *         description: Geçersiz istek verisi
  *       401:
  *         description: Hatalı e-posta veya şifre
+ *       429:
+ *         description: Çok fazla deneme — rate limit aşıldı
  */
-router.post('/auth/login', login);
+// authLimiter: 15 dakikada maks 5 giriş denemesine izin ver (brute-force önlemi)
+router.post('/auth/login', authLimiter, login);
+
+/**
+ * @swagger
+ * /api/auth/logout:
+ *   post:
+ *     summary: Güvenli Çıkış — Token'ı Kara Listeye Alır
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Başarıyla çıkış yapıldı
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Başarıyla çıkış yapıldı
+ *       401:
+ *         description: Geçersiz veya eksik token
+ */
+// authMiddleware: sadece geçerli token sahipleri logout yapabilir
+router.post('/auth/logout', authMiddleware, logout);
 
 export default router;

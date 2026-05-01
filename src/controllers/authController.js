@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import redisClient from '../config/redisClient.js'; // JWT kara liste için Redis client
 
 // @desc    Yeni Kullanıcı Kaydı
 // @route   POST /api/auth/register
@@ -80,6 +81,42 @@ export const login = async (req, res) => {
     });
   } catch (error) {
     res.status(400).json({ message: error.message || 'Giriş başarısız' });
+  }
+};
+
+// @desc    Güvenli Çıkış — Token'ı Redis Kara Listesine Alır
+// @route   POST /api/auth/logout
+// @access  Private (authMiddleware gerektirir)
+export const logout = async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    // Header kontrolü (authMiddleware zaten doğruladı, ama savunmacı programlama)
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(400).json({ message: 'Token bulunamadı' });
+    }
+
+    const token = authHeader.split(' ')[1];
+
+    // Token'ın geri kalan geçerlilik süresini hesapla
+    const decoded = jwt.decode(token); // verify değil, decode — zaten middleware doğruladı
+    const now = Math.floor(Date.now() / 1000); // Unix timestamp (saniye)
+    const ttl = decoded?.exp ? decoded.exp - now : 60 * 60 * 24 * 7; // Fallback: 7 gün
+
+    if (ttl > 0) {
+      try {
+        // Redis'e kara liste kaydı: BL_<token> = 'blacklisted' | TTL = kalan süre (sn)
+        await redisClient.set(`BL_${token}`, 'blacklisted', 'EX', ttl);
+        console.log(`🔒 Token kara listeye alındı. TTL: ${ttl}s | Kullanıcı: ${req.user?._id}`);
+      } catch (redisErr) {
+        // Redis yazma hatası: logluyoruz ama işlemi durdurmuyoruz (graceful degradation)
+        console.error('❌ Redis kara liste yazma hatası:', redisErr.message);
+      }
+    }
+
+    return res.status(200).json({ message: 'Başarıyla çıkış yapıldı' });
+  } catch (error) {
+    res.status(500).json({ message: error.message || 'Çıkış işlemi başarısız' });
   }
 };
 
