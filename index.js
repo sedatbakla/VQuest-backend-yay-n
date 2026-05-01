@@ -10,6 +10,7 @@ import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './src/config/swagger.js';
 import { createServer } from 'http';
 import { initSocket } from './src/services/socketService.js';
+import { generalLimiter } from './src/config/rateLimiter.js'; // Genel API rate limiter
 
 import aiRoutes from './src/routes/aiRoutes.js';
 import notifyRoutes from './src/routes/notifyRoutes.js';
@@ -38,7 +39,17 @@ if (!process.env.JWT_SECRET) {
   console.log('✅ JWT_SECRET is present (Length:', process.env.JWT_SECRET.length, ')');
 }
 
+// Redis Env Check
+if (!process.env.REDIS_URL) {
+  console.warn('⚠️  REDIS_URL tanımlanmadı. Varsayılan redis://localhost:6379 kullanılacak.');
+} else {
+  console.log('✅ REDIS_URL mevcut:', process.env.REDIS_URL);
+}
+
 app.use(express.json());
+
+// Genel API Rate Limiter — Tüm /api rotalarına uygulanır (1 dakikada maks 100 istek)
+app.use('/api', generalLimiter);
 
 // Swagger UI
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
