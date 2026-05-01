@@ -35,7 +35,7 @@ function createRedisStore(prefix) {
 //    Pencere: 15 dakika | Maks: 5 istek
 // -----------------------------------------------------------
 export const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 dakika
+  windowMs: 1 * 60 * 1000, // 15 dakika
   max: 5,                    // pencere başına maks istek sayısı
   standardHeaders: true,     // RateLimit-* başlıklarını ekle (RFC 6585)
   legacyHeaders: false,      // X-RateLimit-* eski başlıklarını kaldır
