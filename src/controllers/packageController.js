@@ -1,6 +1,11 @@
 import Package from '../models/Package.js';
 import Question from '../models/Question.js';
 import mongoose from 'mongoose';
+import redisClient from '../config/redisClient.js'; // Redis caching için
+
+// Cache sabitleri
+const CACHE_KEY = 'packages:list';
+const CACHE_TTL = 3600; // 1 saat (saniye)
 
 // @desc    Soru Paketi Oluşturma (Birleşik Akış)
 // @route   POST /api/packages
@@ -27,6 +32,14 @@ export const createPackage = async (req, res) => {
       creator: req.user._id,
     });
 
+    // Cache Invalidation: Yeni paket eklendi, eski liste cache'lerini sil
+    try {
+      const keys = await redisClient.keys(`${CACHE_KEY}:*`);
+      if (keys.length > 0) await redisClient.del(...keys);
+    } catch (redisErr) {
+      console.error('⚠️  Redis cache invalidation hatası (createPackage):', redisErr.message);
+    }
+
     res.status(201).json(newPackage);
   } catch (error) {
     res.status(400).json({ message: 'Paket oluşturulamadı', error: error.message });
@@ -38,6 +51,24 @@ export const createPackage = async (req, res) => {
 // @access  Private (Madde 26)
 export const listPackages = async (req, res) => {
   try {
+    // Cache anahtarını kullanıcı rolüne göre ayır (admin tüm paketleri, user kısıtlı listeyi görür)
+    const cacheKey = `${CACHE_KEY}:${req.user.role}`;
+
+    // 1) Redis Cache Hit kontrolü
+    try {
+      const cached = await redisClient.get(cacheKey);
+      if (cached) {
+        console.log(`✅ Cache HIT: ${cacheKey}`);
+        res.set('X-Cache', 'HIT');
+        return res.status(200).json(JSON.parse(cached));
+      }
+    } catch (redisErr) {
+      // Redis erişilemezse loglayıp veritabanından devam et (graceful degradation)
+      console.error('⚠️  Redis cache okuma hatası (listPackages):', redisErr.message);
+    }
+
+    // 2) Cache Miss — Veritabanı sorgusu (mevcut iş kuralı aynen korunuyor)
+    console.log(`🔄 Cache MISS: ${cacheKey} — Veritabanından çekiliyor`);
     let query = {};
     if (req.user.role !== 'admin') {
       // Kullanıcılar sadece adminlerin oluşturduğu paketleri görebilsin (Hazır Paket mantığı)
@@ -57,6 +88,16 @@ export const listPackages = async (req, res) => {
     const packages = await Package.find(query)
       .populate('creator', 'username role')
       .populate('questions');
+
+    // 3) Sonucu Redis'e yaz (TTL ile)
+    try {
+      await redisClient.set(cacheKey, JSON.stringify(packages), 'EX', CACHE_TTL);
+      console.log(`💾 Cache SET: ${cacheKey} (TTL: ${CACHE_TTL}s)`);
+    } catch (redisErr) {
+      console.error('⚠️  Redis cache yazma hatası (listPackages):', redisErr.message);
+    }
+
+    res.set('X-Cache', 'MISS');
     res.status(200).json(packages);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -88,6 +129,15 @@ export const updatePackage = async (req, res) => {
     if (questions) existingPackage.questions = questions;
 
     const updatedPackage = await existingPackage.save();
+
+    // Cache Invalidation: Paket güncellendi, eski liste cache'lerini sil
+    try {
+      const keys = await redisClient.keys(`${CACHE_KEY}:*`);
+      if (keys.length > 0) await redisClient.del(...keys);
+    } catch (redisErr) {
+      console.error('⚠️  Redis cache invalidation hatası (updatePackage):', redisErr.message);
+    }
+
     res.status(200).json(updatedPackage);
 
   } catch (error) {
@@ -112,6 +162,15 @@ export const deletePackage = async (req, res) => {
     }
 
     await Package.findByIdAndDelete(packageId);
+
+    // Cache Invalidation: Paket silindi, eski liste cache'lerini sil
+    try {
+      const keys = await redisClient.keys(`${CACHE_KEY}:*`);
+      if (keys.length > 0) await redisClient.del(...keys);
+    } catch (redisErr) {
+      console.error('⚠️  Redis cache invalidation hatası (deletePackage):', redisErr.message);
+    }
+
     res.status(204).send(); // 204 No Content
 
   } catch (error) {
