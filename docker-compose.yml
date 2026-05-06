@@ -1,6 +1,7 @@
+
 services:
-  app:
-    build: .
+  backend:
+    build: ./backend
     container_name: vquest-backend
     restart: unless-stopped
     ports:
@@ -10,11 +11,20 @@ services:
       - MONGO_URI=mongodb://mongo:27017/vquest
       - JWT_SECRET=vquest_super_secret_key_12345!@#
       - NODE_ENV=development
-    volumes:
-      - .:/usr/src/app
-      - /usr/src/app/node_modules
+      # Redis bağlantı URL'si — redisClient.js bu değişkeni okur
+      - REDIS_URL=redis://redis:6379
     depends_on:
       - mongo
+      - redis
+
+  frontend:
+    build: ./frontend
+    container_name: vquest-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80" # Nginx yayın portu
+    depends_on:
+      - backend
 
   mongo:
     image: mongo:latest
@@ -25,5 +35,19 @@ services:
     volumes:
       - mongo-data:/data/db
 
+  # Redis — JWT kara listesi ve rate limiting için
+  redis:
+    image: redis:7-alpine
+    container_name: vquest-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    # Veri kalıcılığı: sunucu yeniden başlatılsa bile kara liste korunur
+    volumes:
+      - redis-data:/data
+    # AOF (Append Only File) ile veri dayanıklılığı
+    command: redis-server --appendonly yes
+
 volumes:
   mongo-data:
+  redis-data:
