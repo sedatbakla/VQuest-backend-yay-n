@@ -31,13 +31,19 @@ export const publishActivityLog = async (logData) => {
 export const consumeActivityLogs = async () => {
   try {
     if (!channel) await connectRabbitMQ();
-    
+
+    // RabbitMQ yoksa (RABBITMQ_URL tanımsız / bağlanamadı) sessizce çık
+    if (!channel) {
+      console.warn('⚠️  RabbitMQ kanalı yok, consumeActivityLogs atlanıyor.');
+      return;
+    }
+
     console.log(`🎧 RabbitMQ dinleniyor: ${QUEUE_NAME}...`);
-    
+
     channel.consume(QUEUE_NAME, (msg) => {
       if (msg !== null) {
         const logData = JSON.parse(msg.content.toString());
-        
+
         // Renkli log formatı oluşturma
         const time = logData.timestamp || new Date().toISOString();
         let actionText = '';
@@ -46,7 +52,7 @@ export const consumeActivityLogs = async () => {
         else actionText = logData.action;
 
         console.log(`\x1b[36m[ACTIVITY LOG]\x1b[0m User \x1b[33m${logData.userId}\x1b[0m ${actionText} \x1b[35m${logData.roomId}\x1b[0m at ${time}`);
-        
+
         // İşlem bitti, kuyruktan düşür
         channel.ack(msg);
       }
