@@ -1,5 +1,7 @@
 import Notification from '../models/Notification.js';
 import { getIO } from '../services/socketService.js';
+import redis from '../../services/redisService.js';
+import { sendToQueue } from '../../services/rabbitService.js';
 
 // @desc    Bildirim Gönderme
 // @route   POST /api/admin/notifications
@@ -16,8 +18,17 @@ export const sendNotification = async (req, res) => {
       message,
     });
 
-    // Socket.io ile anlık bildirim gönder (Tüm bağlı kullanıcılara)
+    // RabbitMQ ile kuyruğa gönder (Asenkron işleme)
     try {
+      await sendToQueue({
+        _id: notification._id,
+        message: notification.message,
+        isRead: false,
+        createdAt: notification.createdAt
+      });
+    } catch (rabbitErr) {
+      console.error('RabbitMQ send error:', rabbitErr.message);
+      // Fallback: RabbitMQ çalışmazsa doğrudan socket ile gönder
       const io = getIO();
       io.emit('newNotification', {
         _id: notification._id,
@@ -25,8 +36,17 @@ export const sendNotification = async (req, res) => {
         isRead: false,
         createdAt: notification.createdAt
       });
-    } catch (socketErr) {
-      console.error('Socket notification emit error:', socketErr.message);
+    }
+
+    // Redis önbelleğini temizle
+    try {
+      const keys = await redis.keys('notifications:*');
+      if (keys.length > 0) {
+        await redis.del(...keys);
+        console.log('🗑️ Bildirim önbelleği temizlendi.');
+      }
+    } catch (redisErr) {
+      console.error('Redis cache clear error:', redisErr.message);
     }
 
     res.status(201).json({
@@ -45,12 +65,24 @@ export const sendNotification = async (req, res) => {
 // @access  Private
 export const listNotifications = async (req, res) => {
   try {
-    const userId = req.user ? req.user._id : null;
+    const userId = req.user ? req.user._id : 'global';
+    const cacheKey = `notifications:${userId}`;
+
+    // Önce Redis'e bak
+    try {
+      const cachedData = await redis.get(cacheKey);
+      if (cachedData) {
+        console.log('⚡ Bildirimler Redis\'ten getirildi.');
+        return res.status(200).json(JSON.parse(cachedData));
+      }
+    } catch (redisErr) {
+      console.error('Redis get error:', redisErr.message);
+    }
 
     // Fetch user specific and global notifications
     const notifications = await Notification.find({
       $or: [
-        { userId: userId },
+        { userId: req.user ? req.user._id : null },
         { userId: { $exists: false } },
         { userId: null }
       ]
@@ -62,6 +94,14 @@ export const listNotifications = async (req, res) => {
       isRead: n.isRead,
       createdAt: n.createdAt
     }));
+
+    // Redis'e kaydet (5 dakika süreli)
+    try {
+      await redis.set(cacheKey, JSON.stringify(formattedNotifications), 'EX', 300);
+      console.log('💾 Bildirimler Redis\'e kaydedildi.');
+    } catch (redisErr) {
+      console.error('Redis set error:', redisErr.message);
+    }
 
     res.status(200).json(formattedNotifications);
   } catch (error) {
@@ -82,6 +122,10 @@ export const markNotificationRead = async (req, res) => {
 
     notification.isRead = true;
     await notification.save();
+
+    // Redis önbelleğini temizle
+    const userId = req.user ? req.user._id : 'global';
+    await redis.del(`notifications:${userId}`);
 
     res.status(200).json({
       _id: notification._id,

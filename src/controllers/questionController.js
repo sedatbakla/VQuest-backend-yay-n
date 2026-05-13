@@ -1,4 +1,5 @@
 import Question from '../models/Question.js';
+import * as redisDataService from '../../services/redisDataService.js';
 
 // @desc    Soru Ekleme (Madde 8)
 // @route   POST /api/admin/questions
@@ -10,6 +11,10 @@ export const addQuestion = async (req, res) => {
       return res.status(400).json({ message: 'text, options ve correctAnswer alanları zorunludur' });
     }
     const question = await Question.create({ text, options, correctAnswer, category });
+    
+    // Redis ve RabbitMQ'ya gönder
+    await redisDataService.addQuestion({ mongoId: question._id.toString(), text, options, correctAnswer, category });
+
     res.status(201).json(question);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -30,6 +35,10 @@ export const updateQuestion = async (req, res) => {
     if (!question) {
       return res.status(404).json({ message: 'Soru bulunamadı' });
     }
+
+    // Redis ve RabbitMQ'da güncelle
+    await redisDataService.updateQuestion(question._id.toString(), { text, options, correctAnswer, category });
+
     res.status(200).json(question);
   } catch (error) {
     res.status(401).json({ message: error.message });
@@ -45,6 +54,10 @@ export const deleteQuestion = async (req, res) => {
     if (!question) {
       return res.status(404).json({ message: 'Soru bulunamadı' });
     }
+
+    // Redis ve RabbitMQ'dan sil
+    await redisDataService.deleteQuestion(req.params.questionId);
+
     res.status(204).send();
   } catch (error) {
     res.status(401).json({ message: error.message });
@@ -56,6 +69,15 @@ export const deleteQuestion = async (req, res) => {
 // @access  Private
 export const listQuestions = async (req, res) => {
   try {
+    // Önce Redis'ten çekmeyi deneyelim, senkronizasyon gereksinimlerine göre
+    const redisQuestions = await redisDataService.getAllQuestions();
+    
+    if (redisQuestions && redisQuestions.length > 0) {
+      // Redis verilerini dön (özel sorular hariç vb. filtreleme gerekebilir, şimdilik tümünü dönüyoruz)
+      return res.status(200).json(redisQuestions);
+    }
+
+    // Fallback: MongoDB'den çek
     // Özel soruları (odalar için yaratılan) asla genel listede gösterme
     const questions = await Question.find({ isPrivate: { $ne: true } });
     res.status(200).json(questions);

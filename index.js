@@ -1,5 +1,9 @@
+
+
 import 'dotenv/config';
 import express from 'express';
+import { createServer } from 'http';
+
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import User from './src/models/User.js';
@@ -8,9 +12,11 @@ import mongoose from 'mongoose';
 import connectDB from './src/config/db.js';
 import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './src/config/swagger.js';
-import { createServer } from 'http';
-import { initSocket } from './src/services/socketService.js';
+import { initSocket, getIO } from './src/services/socketService.js';
+import { connectRabbit, consumeQueue } from './services/rabbitService.js';
 import { generalLimiter } from './src/config/rateLimiter.js'; // Genel API rate limiter
+import { consumeActivityLogs } from './services/rabbitmqService.js';
+import { startAccountDeletionWorker } from './workers/accountDeletionWorker.js';
 
 import aiRoutes from './src/routes/aiRoutes.js';
 import notifyRoutes from './src/routes/notifyRoutes.js';
@@ -29,7 +35,8 @@ app.use(cors()); // Allow requests from local frontend (localhost:5173)
 const httpServer = createServer(app);
 initSocket(httpServer);
 
-connectDB();
+await connectDB();
+consumeActivityLogs();
 const port = process.env.PORT || 3000;
 
 // Env Check (Safe)
@@ -79,7 +86,7 @@ app.use('/api', roomRoutes);
 httpServer.listen(port, () => {
   console.log(`Server is running at ${process.env.NODE_ENV === 'production' ? 'https://vquest-backend-api.onrender.com' : 'http://localhost:' + port}`);
   console.log(`API Docs: https://vquest-backend-api.onrender.com/api-docs`);
-  
+
   // Auto Seed Admin
   const seedAdmin = async () => {
     try {
@@ -99,4 +106,23 @@ httpServer.listen(port, () => {
     }
   };
   seedAdmin();
+
+  // RabbitMQ ve Consumer Başlatma
+  const startRabbit = async () => {
+    try {
+      await connectRabbit();
+      consumeQueue((data) => {
+        const io = getIO();
+        io.emit('newNotification', data);
+        console.log('📢 Bildirim kuyruktan alındı ve Socket.io ile gönderildi.');
+      });
+    } catch (err) {
+      console.error('❌ RabbitMQ başlatılamadı:', err.message);
+    }
+  };
+  startRabbit();
+
+  // Account Deletion Worker — account_deletion_queue'yu dinler
+  // Sunucu ile aynı process'te çalışır, ayrı terminal gerekmez
+  startAccountDeletionWorker();
 });

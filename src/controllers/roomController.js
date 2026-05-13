@@ -1,8 +1,11 @@
 import Room from '../models/Room.js';
 import Question from '../models/Question.js';
 import Package from '../models/Package.js';
+import User from '../models/User.js';
 import mongoose from 'mongoose';
 import { getIO } from '../services/socketService.js';
+import redis from '../../services/redisService.js';
+import { publishActivityLog } from '../../services/rabbitmqService.js';
 
 // @desc    Oda Oluşturma (Madde 15)
 // @route   POST /api/rooms
@@ -56,6 +59,10 @@ export const createRoom = async (req, res) => {
       joinCode,
       participants: [{ userId: hostId, score: 0 }]
     });
+
+    // Redis'e odayı açan kullanıcıyı ekle
+    await redis.zadd(`room:${room._id}:leaderboard`, 0, hostId.toString());
+
     res.status(201).json(room);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -86,6 +93,9 @@ export const joinByCode = async (req, res) => {
     if (!alreadyJoined) {
       room.participants.push({ userId: req.user._id, score: 0 });
       await room.save();
+      
+      // Redis leaderboard'a ekle (0 puanla)
+      await redis.zadd(`room:${room._id}:leaderboard`, 0, req.user._id.toString());
     }
 
     // Socket üzerinden katılımcı listesini güncelle
@@ -143,6 +153,9 @@ export const submitAnswer = async (req, res) => {
     if (participant && isCorrect) {
       participant.score += 10;
       await room.save();
+
+      // Redis Sorted Set üzerinden skoru artır
+      await redis.zincrby(`room:${req.params.roomId}:leaderboard`, 10, req.user._id.toString());
     }
 
     res.status(200).json({ isCorrect });
@@ -173,7 +186,18 @@ export const joinRoom = async (req, res) => {
     if (!alreadyJoined) {
       room.participants.push({ userId: req.user._id, score: 0 });
       await room.save();
+
+      // Redis leaderboard'a ekle (0 puanla)
+      await redis.zadd(`room:${room._id}:leaderboard`, 0, req.user._id.toString());
     }
+
+    // RabbitMQ'ya log gönder
+    publishActivityLog({
+      userId: req.user._id.toString(),
+      action: 'joined_room',
+      roomId: req.params.roomId,
+      timestamp: new Date().toISOString()
+    });
 
     res.status(200).json(room);
   } catch (error) {
@@ -215,9 +239,51 @@ export const getLeaderboard = async (req, res) => {
       return res.status(404).json({ message: 'Oda bulunamadı' });
     }
 
-    const leaderboard = room.participants
-      .map((p) => ({ userId: p.userId, score: p.score }))
-      .sort((a, b) => b.score - a.score);
+    const redisKey = `room:${req.params.roomId}:leaderboard`;
+    // Redis'ten en yüksek puandan düşüğe çek (WITHSCORES -> ["userId1", "20", "userId2", "10"])
+    const redisLeaderboard = await redis.zrevrange(redisKey, 0, -1, 'WITHSCORES');
+
+    const leaderboard = [];
+    
+    // Eğer Redis'te veri yoksa fallback olarak Room.participants dönebiliriz.
+    if (redisLeaderboard.length > 0) {
+      const userIds = [];
+      for (let i = 0; i < redisLeaderboard.length; i += 2) {
+        userIds.push(redisLeaderboard[i]);
+      }
+
+      const users = await User.find({ _id: { $in: userIds } }).select('username');
+      const userMap = {};
+      users.forEach(u => userMap[u._id.toString()] = u.username);
+
+      for (let i = 0; i < redisLeaderboard.length; i += 2) {
+        const userId = redisLeaderboard[i];
+        const score = parseInt(redisLeaderboard[i + 1], 10);
+        leaderboard.push({
+          userId,
+          username: userMap[userId] || 'Bilinmeyen Kullanıcı',
+          score
+        });
+      }
+    } else {
+      // Fallback
+      const participantsWithScore = room.participants.map((p) => ({ userId: p.userId, score: p.score })).sort((a, b) => b.score - a.score);
+      // Fallback durumunda username bilgisi için populate yapmadığımız için DB'den çekelim
+      if (participantsWithScore.length > 0) {
+        const pIds = participantsWithScore.map(p => p.userId);
+        const pUsers = await User.find({ _id: { $in: pIds } }).select('username');
+        const pMap = {};
+        pUsers.forEach(u => pMap[u._id.toString()] = u.username);
+        
+        participantsWithScore.forEach(p => {
+          leaderboard.push({
+            userId: p.userId,
+            username: pMap[p.userId.toString()] || 'Bilinmeyen Kullanıcı',
+            score: p.score
+          });
+        });
+      }
+    }
 
     res.status(200).json(leaderboard);
   } catch (error) {
@@ -248,6 +314,14 @@ export const kickParticipant = async (req, res) => {
     room.participants.splice(participantIndex, 1);
     await room.save();
 
+    // RabbitMQ'ya log gönder
+    publishActivityLog({
+      userId: req.params.userId,
+      action: 'kicked_from_room',
+      roomId: req.params.roomId,
+      timestamp: new Date().toISOString()
+    });
+
     res.status(204).send();
   } catch (error) {
     res.status(401).json({ message: error.message });
@@ -269,6 +343,9 @@ export const closeRoom = async (req, res) => {
 
     room.status = 'closed';
     await room.save();
+
+    // Redis'ten odaya ait leaderboard anahtarını sil
+    await redis.del(`room:${req.params.roomId}:leaderboard`);
 
     res.status(204).send();
   } catch (error) {

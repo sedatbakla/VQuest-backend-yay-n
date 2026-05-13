@@ -1,4 +1,5 @@
 import Category from '../models/Category.js';
+import * as redisDataService from '../../services/redisDataService.js';
 
 // @desc    Yeni kategori ekle (Madde 9)
 // @route   POST /api/admin/categories
@@ -10,6 +11,10 @@ export const addCategory = async (req, res) => {
       return res.status(401).json({ message: 'name alanı zorunludur' });
     }
     const category = await Category.create({ name });
+
+    // Redis ve RabbitMQ'ya gönder
+    await redisDataService.addCategory({ mongoId: category._id.toString(), name });
+
     res.status(201).json(category);
   } catch (error) {
     res.status(401).json({ message: error.message });
@@ -33,6 +38,10 @@ export const updateCategory = async (req, res) => {
     if (!category) {
       return res.status(404).json({ message: 'Kategori bulunamadı' });
     }
+
+    // Redis ve RabbitMQ'da güncelle
+    await redisDataService.updateCategory(category._id.toString(), { name });
+
     res.status(200).json(category);
   } catch (error) {
     res.status(401).json({ message: error.message });
@@ -44,6 +53,14 @@ export const updateCategory = async (req, res) => {
 // @access  Public
 export const listCategories = async (req, res) => {
   try {
+    // Önce Redis'ten çekmeyi deneyelim
+    const redisCategories = await redisDataService.getAllCategories();
+
+    if (redisCategories && redisCategories.length > 0) {
+      return res.status(200).json(redisCategories);
+    }
+
+    // Fallback: MongoDB'den çek
     const categories = await Category.find();
     res.status(200).json(categories);
   } catch (error) {

@@ -1,4 +1,5 @@
 import Suggestion from '../models/Suggestion.js';
+import { sendToQueue } from '../../services/rabbitService.js';
 
 // @desc    Soru Önerisi Yapma
 // @route   POST /api/suggestions
@@ -14,6 +15,15 @@ export const makeSuggestion = async (req, res) => {
       correctAnswer,
       category,
       status: 'pending' // Varsayılan değer
+    });
+
+    // RabbitMQ'ya bildirim gönder
+    await sendToQueue({
+      type: 'SUGGESTION_CREATED',
+      message: 'Sisteme yeni bir soru önerisi yapıldı!',
+      suggestionId: newSuggestion._id,
+      userId: req.user._id,
+      timestamp: new Date()
     });
 
     res.status(201).json(newSuggestion);
@@ -51,6 +61,16 @@ export const rejectSuggestion = async (req, res) => {
     }
 
     await Suggestion.findByIdAndDelete(suggestionId);
+    
+    // RabbitMQ'ya bildirim gönder
+    await sendToQueue({
+      type: 'SUGGESTION_REJECTED',
+      message: 'Bir soru önerisi yönetici tarafından reddedildi.',
+      suggestionId: suggestionId,
+      userId: suggestion.user,
+      timestamp: new Date()
+    });
+
     res.status(204).send(); // 204 No Content
   } catch (error) {
     res.status(400).json({ message: 'Öneri silinemedi/reddedilemedi', error: error.message });
