@@ -44,11 +44,6 @@ export const consumeQueue = async (callback) => {
   if (!channel) {
     await connectRabbit();
   }
-  // connectRabbit başarısız olursa channel hâlâ null olabilir
-  if (!channel) {
-    console.error('❌ RabbitMQ kanalı kurulamadı, consumeQueue atlanıyor.');
-    return;
-  }
   channel.consume(queueName, (msg) => {
     if (msg !== null) {
       const content = JSON.parse(msg.content.toString());
