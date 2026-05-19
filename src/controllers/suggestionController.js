@@ -8,12 +8,15 @@ export const makeSuggestion = async (req, res) => {
   try {
     const { questionText, options, correctAnswer, category } = req.body;
 
+    // "undefined" metni string olarak gelirse veritabanı çökmesin diye null yapıyoruz
+    const safeCategory = (category === 'undefined' || !category) ? undefined : category;
+
     const newSuggestion = await Suggestion.create({
       user: req.user._id,
       questionText,
       options,
       correctAnswer,
-      category: category || undefined,
+      category: safeCategory,
       status: 'pending' // Varsayılan değer
     });
 
