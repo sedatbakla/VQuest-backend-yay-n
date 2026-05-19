@@ -13,18 +13,22 @@ export const makeSuggestion = async (req, res) => {
       questionText,
       options,
       correctAnswer,
-      category,
+      category: category || undefined,
       status: 'pending' // Varsayılan değer
     });
 
-    // RabbitMQ'ya bildirim gönder
-    await sendToQueue({
-      type: 'SUGGESTION_CREATED',
-      message: 'Sisteme yeni bir soru önerisi yapıldı!',
-      suggestionId: newSuggestion._id,
-      userId: req.user._id,
-      timestamp: new Date()
-    });
+    // RabbitMQ'ya bildirim gönder (opsiyonel — başarısız olursa öneri yine kaydedilir)
+    try {
+      await sendToQueue({
+        type: 'SUGGESTION_CREATED',
+        message: 'Sisteme yeni bir soru önerisi yapıldı!',
+        suggestionId: newSuggestion._id,
+        userId: req.user._id,
+        timestamp: new Date()
+      });
+    } catch (mqErr) {
+      console.warn('[Suggestion] RabbitMQ bildirimi gönderilemedi (önemli değil):', mqErr.message);
+    }
 
     res.status(201).json(newSuggestion);
   } catch (error) {
@@ -62,14 +66,18 @@ export const rejectSuggestion = async (req, res) => {
 
     await Suggestion.findByIdAndDelete(suggestionId);
     
-    // RabbitMQ'ya bildirim gönder
-    await sendToQueue({
-      type: 'SUGGESTION_REJECTED',
-      message: 'Bir soru önerisi yönetici tarafından reddedildi.',
-      suggestionId: suggestionId,
-      userId: suggestion.user,
-      timestamp: new Date()
-    });
+    // RabbitMQ'ya bildirim gönder (opsiyonel)
+    try {
+      await sendToQueue({
+        type: 'SUGGESTION_REJECTED',
+        message: 'Bir soru önerisi yönetici tarafından reddedildi.',
+        suggestionId: suggestionId,
+        userId: suggestion.user,
+        timestamp: new Date()
+      });
+    } catch (mqErr) {
+      console.warn('[Suggestion] RabbitMQ bildirimi gönderilemedi (önemli değil):', mqErr.message);
+    }
 
     res.status(204).send(); // 204 No Content
   } catch (error) {
