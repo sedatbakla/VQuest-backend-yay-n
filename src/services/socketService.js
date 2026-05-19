@@ -1,5 +1,7 @@
 import { Server } from 'socket.io';
+import mongoose from 'mongoose';
 import Room from '../models/Room.js';
+import redis from '../../services/redisService.js';
 
 let io;
 
@@ -18,21 +20,26 @@ export const initSocket = (server) => {
 
     // Odaya Katılma
     socket.on('joinRoom', async ({ roomId, user }) => {
-      socket.join(roomId);
-      
-      const room = await Room.findById(roomId);
-      const isHost = room?.hostId.toString() === (user?._id || user?.id);
-      
-      socketToRoom.set(socket.id, { roomId, userId: user?._id || user?.id, isHost });
-      console.log(`${user.username} odaya katıldı: ${roomId} (Host: ${isHost})`);
-
       try {
+        // ObjectId format validation
+        if (!mongoose.isValidObjectId(roomId)) {
+          socket.emit('error', { message: 'Geçersiz roomId formatı' });
+          return;
+        }
+
+        socket.join(roomId);
+        const room = await Room.findById(roomId);
+        const isHost = room?.hostId.toString() === (user?._id || user?.id);
+
+        socketToRoom.set(socket.id, { roomId, userId: user?._id || user?.id, isHost });
+        console.log(`${user?.username} odaya katıldı: ${roomId} (Host: ${isHost})`);
+
         const updatedRoom = await Room.findById(roomId).populate('participants.userId', 'username');
         if (updatedRoom) {
           io.to(roomId).emit('updateScoreboard', updatedRoom.participants);
         }
       } catch (err) {
-        console.error('joinRoom Error:', err);
+        console.error('joinRoom socket error:', err);
       }
     });
 
@@ -46,45 +53,53 @@ export const initSocket = (server) => {
       io.to(roomId).emit('nextQuestion', { questionIndex });
     });
 
-    // Soru Cevaplama ve Skor Güncelleme
-    socket.on('submitAnswer', async ({ roomId, userId, isCorrect, score }) => {
+    // Skor Tablosu Yayını (REST API submit'ten sonra server tetikler)
+    // ⚠️ GÜVENLİK: İstemciden doğrudan skor/isCorrect kabul EDİLMEZ.
+    // Bu handler yalnızca server'ın skorboard güncellemesi için kullanılır.
+    socket.on('requestScoreboard', async ({ roomId }) => {
       try {
-        const room = await Room.findById(roomId);
-        if (room) {
-          const pIdx = room.participants.findIndex(p => p.userId.toString() === userId);
-          if (pIdx > -1) {
-            room.participants[pIdx].score += (isCorrect ? score : 0);
-            await room.save();
-            const updatedRoom = await Room.findById(roomId).populate('participants.userId', 'username');
-            io.to(roomId).emit('updateScoreboard', updatedRoom.participants);
-          }
+        if (!mongoose.isValidObjectId(roomId)) return;
+        const updatedRoom = await Room.findById(roomId).populate('participants.userId', 'username');
+        if (updatedRoom) {
+          io.to(roomId).emit('updateScoreboard', updatedRoom.participants);
         }
       } catch (err) {
-        console.error('submitAnswer Error:', err);
+        console.error('requestScoreboard error:', err);
       }
     });
 
-    // Odayı Kapatma (Manuel)
+    // Odayı Kapatma — Socket eventi (REST API closeRoom ile paralel)
     socket.on('closeRoom', async ({ roomId }) => {
       try {
-        await Room.findByIdAndDelete(roomId);
-        io.to(roomId).emit('roomClosed');
-        console.log(`Oda kapatıldı: ${roomId}`);
+        if (!mongoose.isValidObjectId(roomId)) return;
+        // Odayı silmek yerine status'u closed yap (veri kaybını önle)
+        await Room.findByIdAndUpdate(roomId, { status: 'closed', isStarted: false });
+        // ✅ Redis leaderboard temizle
+        await redis.del(`room:${roomId}:leaderboard`);
+        io.to(roomId).emit('roomClosed', { roomId });
+        console.log(`Oda kapatıldı (socket): ${roomId}`);
       } catch (err) {
-        console.error('closeRoom Error:', err);
+        console.error('closeRoom socket error:', err);
       }
     });
 
     socket.on('disconnect', async () => {
-      const data = socketToRoom.get(socket.id);
-      if (data) {
-        const { roomId, isHost } = data;
-        if (isHost) {
-          console.log(`Host ayrıldı, oda kapatılıyor: ${roomId}`);
-          await Room.findByIdAndDelete(roomId);
-          io.to(roomId).emit('roomClosed');
+      try {
+        const data = socketToRoom.get(socket.id);
+        if (data) {
+          const { roomId, isHost } = data;
+          if (isHost && mongoose.isValidObjectId(roomId)) {
+            console.log(`Host ayrıldı, oda kapatılıyor: ${roomId}`);
+            // Silmek yerine kapat — tarihsel veriler korunur
+            await Room.findByIdAndUpdate(roomId, { status: 'closed', isStarted: false });
+            // ✅ Redis leaderboard temizle
+            await redis.del(`room:${roomId}:leaderboard`);
+            io.to(roomId).emit('roomClosed', { roomId });
+          }
+          socketToRoom.delete(socket.id);
         }
-        socketToRoom.delete(socket.id);
+      } catch (err) {
+        console.error('disconnect handler error:', err);
       }
       console.log('Bağlantı kesildi:', socket.id);
     });

@@ -1,5 +1,9 @@
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
+import amqp from 'amqplib';
+
+const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://guest:guest@localhost:5672';
+const ACCOUNT_DELETION_QUEUE = 'account_deletion_queue';
 
 // @desc    Profil Görüntüleme
 // @route   GET /api/profile
@@ -52,10 +56,43 @@ export const updatePassword = async (req, res) => {
 // @route   DELETE /api/profile
 // @access  Private (Madde 7)
 export const deleteProfile = async (req, res) => {
+  let connection = null;
   try {
-    await User.findByIdAndDelete(req.user._id);
+    const userId = req.user._id.toString();
+
+    // 1. RabbitMQ'ya bağlan
+    connection = await amqp.connect(RABBITMQ_URL);
+    const channel = await connection.createChannel();
+
+    // 2. Kuyruğu garantile
+    await channel.assertQueue(ACCOUNT_DELETION_QUEUE, { durable: true });
+
+    // 3. Mesaj içeriği
+    const message = {
+      userId,
+      requestedAt: new Date().toISOString(),
+      requestedBy: userId
+    };
+
+    // 4. Kuyruğa ekle
+    channel.sendToQueue(
+      ACCOUNT_DELETION_QUEUE,
+      Buffer.from(JSON.stringify(message)),
+      { persistent: true }
+    );
+
+    await channel.close();
+
+    // İşlem kuyruğa alındı, anında yanıt dön (204 No Content veya 202 Accepted)
     res.status(204).send();
   } catch (error) {
+    console.error('Hesap silme kuyruk hatası:', error.message);
     res.status(400).json({ message: 'Hesap silinemedi' });
+  } finally {
+    if (connection) {
+      try {
+        await connection.close();
+      } catch (err) {}
+    }
   }
 };

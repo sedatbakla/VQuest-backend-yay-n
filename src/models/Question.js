@@ -7,7 +7,14 @@ const questionSchema = new mongoose.Schema({
   },
   options: {
     type: [String],
-    required: true
+    required: true,
+    validate: {
+      validator: function(v) {
+        if (!Array.isArray(v)) return false;
+        return v.filter(opt => opt && opt.trim() !== '').length >= 2;
+      },
+      message: 'Şıkların en az 2 tanesinin doldurulması zorunluluğu vardır.'
+    }
   },
   correctAnswer: {
     type: String,

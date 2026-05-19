@@ -61,12 +61,12 @@ export async function addQuestion(questionData) {
   try {
     const id = crypto.randomUUID();
     const dataToSave = { id, ...questionData };
-    
+
     await redis.hset('questions', id, JSON.stringify(dataToSave));
-    
+
     // Olayı Fırlat
     await publishEvent('question.created', { action: 'CREATE', data: dataToSave });
-    
+
     return dataToSave;
   } catch (error) {
     console.error('❌ Soru ekleme hatası:', error.message);
@@ -77,12 +77,12 @@ export async function addQuestion(questionData) {
 export async function updateQuestion(id, updatedData) {
   try {
     const dataToSave = { id, ...updatedData };
-    
+
     await redis.hset('questions', id, JSON.stringify(dataToSave));
-    
+
     // Olayı Fırlat
     await publishEvent('question.updated', { action: 'UPDATE', data: dataToSave });
-    
+
     return dataToSave;
   } catch (error) {
     console.error('❌ Soru güncelleme hatası:', error.message);
@@ -93,10 +93,10 @@ export async function updateQuestion(id, updatedData) {
 export async function deleteQuestion(id) {
   try {
     await redis.hdel('questions', id);
-    
+
     // Olayı Fırlat
     await publishEvent('question.deleted', { action: 'DELETE', data: { id } });
-    
+
     return { success: true, message: `Soru ${id} silindi.` };
   } catch (error) {
     console.error('❌ Soru silme hatası:', error.message);
@@ -122,12 +122,12 @@ export async function addCategory(categoryData) {
   try {
     const id = crypto.randomUUID();
     const dataToSave = { id, ...categoryData };
-    
+
     await redis.hset('categories', id, JSON.stringify(dataToSave));
-    
+
     // Olayı Fırlat
     await publishEvent('category.created', { action: 'CREATE', data: dataToSave });
-    
+
     return dataToSave;
   } catch (error) {
     console.error('❌ Kategori ekleme hatası:', error.message);
@@ -138,12 +138,12 @@ export async function addCategory(categoryData) {
 export async function updateCategory(id, updatedData) {
   try {
     const dataToSave = { id, ...updatedData };
-    
+
     await redis.hset('categories', id, JSON.stringify(dataToSave));
-    
+
     // Olayı Fırlat
     await publishEvent('category.updated', { action: 'UPDATE', data: dataToSave });
-    
+
     return dataToSave;
   } catch (error) {
     console.error('❌ Kategori güncelleme hatası:', error.message);
@@ -154,10 +154,10 @@ export async function updateCategory(id, updatedData) {
 export async function deleteCategory(id) {
   try {
     await redis.hdel('categories', id);
-    
+
     // Olayı Fırlat
     await publishEvent('category.deleted', { action: 'DELETE', data: { id } });
-    
+
     return { success: true, message: `Kategori ${id} silindi.` };
   } catch (error) {
     console.error('❌ Kategori silme hatası:', error.message);
