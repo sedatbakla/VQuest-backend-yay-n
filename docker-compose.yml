@@ -1,7 +1,6 @@
-
 services:
-  backend:
-    build: ./backend
+  app:
+    build: .
     container_name: vquest-backend
     restart: unless-stopped
     ports:
@@ -11,20 +10,15 @@ services:
       - MONGO_URI=mongodb://mongo:27017/vquest
       - JWT_SECRET=vquest_super_secret_key_12345!@#
       - NODE_ENV=development
-      # Redis bağlantı URL'si — redisClient.js bu değişkeni okur
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
       - REDIS_URL=redis://redis:6379
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
     depends_on:
       - mongo
+      - rabbitmq
       - redis
-
-  frontend:
-    build: ./frontend
-    container_name: vquest-frontend
-    restart: unless-stopped
-    ports:
-      - "80:80" # Nginx yayın portu
-    depends_on:
-      - backend
 
   mongo:
     image: mongo:latest
@@ -35,19 +29,23 @@ services:
     volumes:
       - mongo-data:/data/db
 
-  # Redis — JWT kara listesi ve rate limiting için
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: vquest-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"    # AMQP (uygulama bağlantısı)
+      - "15672:15672"  # Yönetim paneli
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+
   redis:
     image: redis:7-alpine
     container_name: vquest-redis
     restart: unless-stopped
     ports:
       - "6379:6379"
-    # Veri kalıcılığı: sunucu yeniden başlatılsa bile kara liste korunur
-    volumes:
-      - redis-data:/data
-    # AOF (Append Only File) ile veri dayanıklılığı
-    command: redis-server --appendonly yes
 
 volumes:
   mongo-data:
-  redis-data:

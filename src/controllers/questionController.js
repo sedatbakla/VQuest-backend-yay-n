@@ -50,17 +50,29 @@ export const updateQuestion = async (req, res) => {
 // @access  Admin
 export const deleteQuestion = async (req, res) => {
   try {
-    const question = await Question.findByIdAndDelete(req.params.questionId);
-    if (!question) {
-      return res.status(404).json({ message: 'Soru bulunamadı' });
-    }
+    const { questionId } = req.params;
 
-    // Redis ve RabbitMQ'dan sil
-    await redisDataService.deleteQuestion(req.params.questionId);
+    // Geçerli MongoDB ObjectId mi kontrol et
+    const isValidObjectId = /^[a-f\d]{24}$/i.test(questionId);
+
+    if (isValidObjectId) {
+      // MongoDB'den sil
+      const question = await Question.findByIdAndDelete(questionId);
+      if (!question) {
+        // MongoDB'de yoksa Redis'te de temizle ve başarılı say
+        await redisDataService.deleteQuestion(questionId);
+        return res.status(204).send();
+      }
+      // Redis ve RabbitMQ'dan sil
+      await redisDataService.deleteQuestion(questionId);
+    } else {
+      // UUID formatında ID — sadece Redis'ten sil (eski/test verisi)
+      await redisDataService.deleteQuestion(questionId);
+    }
 
     res.status(204).send();
   } catch (error) {
-    res.status(401).json({ message: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
