@@ -151,6 +151,18 @@ export const deleteNotification = async (req, res) => {
 
     await notification.deleteOne();
 
+    // Redis önbelleğini temizle — silinen bildirim cache'de kalmasın
+    try {
+      const userId = req.user ? req.user._id : 'global';
+      const keys = await redis.keys('notifications:*');
+      if (keys.length > 0) {
+        await redis.del(...keys);
+        console.log('🗑️ Bildirim silme sonrası önbellek temizlendi.');
+      }
+    } catch (redisErr) {
+      console.error('Redis cache clear error (delete):', redisErr.message);
+    }
+
     res.status(204).send();
   } catch (error) {
     res.status(400).json({ message: 'Bildirim silinemedi' });

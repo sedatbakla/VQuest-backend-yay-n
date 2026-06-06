@@ -15,6 +15,8 @@ const redis = REDIS_URL
       retryStrategy: (times) => Math.min(times * 50, 2000),
     });
 
+
+
 redis.on('connect', () => {
   console.log('✅ Redis bağlantısı başarılı.');
 });

@@ -1,5 +1,5 @@
 import express from 'express';
-import { listCategories, addCategory, updateCategory } from '../controllers/categoryController.js';
+import { listCategories, addCategory, updateCategory, deleteCategory } from '../controllers/categoryController.js';
 import { authMiddleware } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
@@ -107,6 +107,29 @@ router.post('/admin/categories', authMiddleware, addCategory);
  *               $ref: '#/components/schemas/Error'
  */
 router.put('/admin/categories/:categoryId', authMiddleware, updateCategory);
+
+/**
+ * @swagger
+ * /api/admin/categories/{categoryId}:
+ *   delete:
+ *     summary: Kategori sil (Admin)
+ *     tags: [Categories]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: categoryId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Kategori ID
+ *     responses:
+ *       204:
+ *         description: Kategori silindi
+ *       404:
+ *         description: Kategori bulunamadi
+ */
+router.delete('/admin/categories/:categoryId', authMiddleware, deleteCategory);
 
 export default router;
 

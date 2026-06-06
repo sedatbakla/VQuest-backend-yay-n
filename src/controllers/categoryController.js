@@ -67,3 +67,22 @@ export const listCategories = async (req, res) => {
     res.status(401).json({ message: error.message });
   }
 };
+
+// @desc    Kategori Silme
+// @route   DELETE /api/admin/categories/:categoryId
+// @access  Admin
+export const deleteCategory = async (req, res) => {
+  try {
+    const category = await Category.findByIdAndDelete(req.params.categoryId);
+    if (!category) {
+      return res.status(404).json({ message: 'Kategori bulunamadı' });
+    }
+
+    // Redis ve RabbitMQ'dan sil
+    await redisDataService.deleteCategory(category._id.toString());
+
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};

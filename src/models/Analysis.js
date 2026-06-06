@@ -4,7 +4,7 @@ const analysisSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: false,
+    required: false, // Auth middleware ile korunuyor; edge case'lerde null olabilir
   },
   analysisText: {
     type: String,
