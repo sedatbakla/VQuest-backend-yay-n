@@ -23,7 +23,7 @@ export const getAiPrompt = async (req, res) => {
 export const startAnalysis = async (req, res) => {
   try {
     const userId = req.user ? req.user._id : null;
-    const { performanceData } = req.body; // Array of { category, isCorrect }
+    const performanceData = req.body?.performanceData; // Array of { category, isCorrect }
 
     let userStats;
     let isManualStart = false;

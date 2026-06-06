@@ -10,6 +10,9 @@
 
 import amqp from 'amqplib';
 import dotenv from 'dotenv';
+import mongoose from 'mongoose';
+import connectDB from '../src/config/db.js';
+import User from '../src/models/User.js';
 
 dotenv.config();
 
@@ -19,32 +22,24 @@ const ACCOUNT_DELETION_QUEUE = 'account_deletion_queue';
 const RECONNECT_DELAY_MS = 5000; // Bağlantı kopunca tekrar deneme süresi (ms)
 
 // ─── Yardımcı: Asenkron Bekleme ───────────────────────────────────────────────
-/**
- * Belirtilen süre kadar bekler. Veritabanı işlemlerini simüle etmek için kullanılır.
- * @param {number} ms - Bekleme süresi (milisaniye)
- */
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// ─── Veritabanı Silme Simülasyonu ─────────────────────────────────────────────
+// ─── Gerçek Veritabanı Silme ──────────────────────────────────────────────────
 /**
- * Kullanıcıya ait tüm verilerin silinmesini simüle eder.
- * Gerçek uygulamada buraya MongoDB/PostgreSQL silme sorguları gelir.
+ * Kullanıcıyı MongoDB'den kalıcı olarak siler.
  *
  * @param {string} userId - Silinecek kullanıcının ID'si
  */
-const simulateDatabaseCleanup = async (userId) => {
-  console.log(`\n🗑️  userId: ${userId} için veritabanı temizliği yapılıyor... (skorlar, analizler, profil siliniyor)`);
+const deleteUserFromDB = async (userId) => {
+  console.log(`\n🗑️  userId: ${userId} için veritabanı silme işlemi başlıyor...`);
 
-  // Gerçek silme işlemlerinin süresini simüle eden 2 saniyelik bekleme
-  await sleep(2000);
+  const deletedUser = await User.findByIdAndDelete(userId);
 
-  // Gerçek uygulamada bu blok şunları içerir:
-  // await Score.deleteMany({ userId });
-  // await Analysis.deleteMany({ userId });
-  // await User.findByIdAndDelete(userId);
-  // await Session.deleteMany({ userId });
-
-  console.log(`✅ userId: ${userId} için tüm veriler başarıyla temizlendi.`);
+  if (deletedUser) {
+    console.log(`✅ userId: ${userId} (${deletedUser.username}) MongoDB'den başarıyla silindi.`);
+  } else {
+    console.warn(`⚠️  userId: ${userId} bulunamadı — zaten silinmiş olabilir.`);
+  }
 };
 
 // ─── Ana Worker Fonksiyonu ────────────────────────────────────────────────────
@@ -54,6 +49,10 @@ const simulateDatabaseCleanup = async (userId) => {
  * Bağlantı kopması durumunda otomatik olarak yeniden bağlanmayı dener.
  */
 export const startAccountDeletionWorker = async () => {
+  // Veritabanı bağlantısı yoksa kur (index.js üzerinden çalışırken zaten bağlı olur)
+  if (mongoose.connection.readyState === 0) {
+    await connectDB();
+  }
   let connection = null;
 
   try {
@@ -91,8 +90,8 @@ export const startAccountDeletionWorker = async () => {
         console.log(`   → requestedBy : ${requestedBy}`);
         console.log(`   → requestedAt : ${requestedAt}`);
 
-        // 6. Veritabanı temizliğini simüle et
-        await simulateDatabaseCleanup(userId);
+        // 6. Kullanıcıyı veritabanından gerçekten sil
+        await deleteUserFromDB(userId);
 
         // 7. İşlem başarılı → RabbitMQ'ya ack() gönder (mesajı kuyruktan düşür)
         channel.ack(msg);
