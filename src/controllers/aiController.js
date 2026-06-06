@@ -1,6 +1,7 @@
 import Analysis from '../models/Analysis.js';
 import Notification from '../models/Notification.js';
 import SystemConfig from '../models/SystemConfig.js';
+import User from '../models/User.js';
 import { generateAnalysis } from '../services/geminiServices.js';
 
 // @desc    Mevcut AI Promptu Getir
@@ -24,25 +25,44 @@ export const startAnalysis = async (req, res) => {
     const userId = req.user ? req.user._id : null;
     const { performanceData } = req.body; // Array of { category, isCorrect }
 
-    // Aggregate performance by category
-    const stats = performanceData ? performanceData.reduce((acc, curr) => {
-      if (!acc[curr.category]) acc[curr.category] = { correct: 0, total: 0 };
-      acc[curr.category].total += 1;
-      if (curr.isCorrect) acc[curr.category].correct += 1;
-      return acc;
-    }, {}) : {};
+    let userStats;
+    let isManualStart = false;
 
-    const userStats = {
-      performance: stats,
-      totalQuestions: performanceData?.length || 0,
-      timestamp: new Date().toISOString()
-    };
+    if (performanceData && performanceData.length > 0) {
+      // Aggregate performance by category
+      const stats = performanceData.reduce((acc, curr) => {
+        if (!acc[curr.category]) acc[curr.category] = { correct: 0, total: 0 };
+        acc[curr.category].total += 1;
+        if (curr.isCorrect) acc[curr.category].correct += 1;
+        return acc;
+      }, {});
+
+      userStats = {
+        type: 'Oyun Sonu Performans Analizi',
+        performance: stats,
+        totalQuestions: performanceData.length,
+        timestamp: new Date().toISOString()
+      };
+    } else {
+      // Manual start from AnalysisScreen without performanceData
+      isManualStart = true;
+      let user = null;
+      if (userId) user = await User.findById(userId);
+      
+      userStats = {
+        type: 'Genel Profil Analizi',
+        globalScore: user ? user.score : 0,
+        level: user ? (user.score > 500 ? 'İleri' : user.score > 100 ? 'Orta' : 'Başlangıç') : 'Başlangıç',
+        message: 'Kullanıcı genel profil değerlendirmesi talep ediyor.',
+        timestamp: new Date().toISOString()
+      };
+    }
     
     console.log('--- AI Analysis Start ---');
     console.log('User Stats:', JSON.stringify(userStats));
 
     let systemPromptConfig = await SystemConfig.findOne({ key: 'AI_PROMPT' });
-    let promptText = systemPromptConfig ? systemPromptConfig.value : 'Kullanıcının bu oyundaki performansını analiz et ve SADECE 1 CÜMLELİK kısa bir tavsiye veya geri bildirim ver. Başka hiçbir şey yazma. Türkçe cevap ver.';
+    let promptText = systemPromptConfig ? systemPromptConfig.value : 'Kullanıcının bu performansını analiz et ve SADECE 1 CÜMLELİK kısa bir tavsiye veya geri bildirim ver. Başka hiçbir şey yazma. Türkçe cevap ver.';
 
     const finalPrompt = promptText + "\nDİKKAT KATI KURAL: Vereceğin yanıt istisnasız SADECE VE SADECE 1 CÜMLE olacaktır. Ne olursa olsun ikinci bir cümleye geçme!";
     console.log('Final Prompt:', finalPrompt);
@@ -59,12 +79,51 @@ export const startAnalysis = async (req, res) => {
     } catch (aiErr) {
       console.error('AI Error during generation:', aiErr);
       
-      // FALLBACK: AI çalışmazsa kullanıcıya boş dönmek yerine istatistiklerden basit rapor üretelim
-      const topCategory = Object.entries(stats).sort((a,b) => b[1].total - a[1].total)[0];
-      const categoryName = topCategory ? topCategory[0] : 'Genel';
-      const accuracy = topCategory ? Math.round((topCategory[1].correct / topCategory[1].total) * 100) : 0;
+      // FALLBACK: AI çalışmazsa kullanıcıya boş dönmek yerine istatistiklerden akıllıca bir rapor üretelim
+      if (isManualStart) {
+        const score = userStats.globalScore;
+        if (score >= 500) {
+          const variants = [
+            `Muazzam bir gelişim gösteriyorsun! Toplam ${score} puan ile ileri seviyedesin, zihinsel reflekslerin çok keskin.`,
+            `${score} puanla rakiplerine fark atıyorsun, stratejik zekan ve bilgi birikimin üst seviyede.`,
+            `Harika! ${score} puan toplamak kolay değil, bu alandaki ustalığını kanıtlamış durumdasın.`
+          ];
+          analysisText = variants[Math.floor(Math.random() * variants.length)];
+        } else if (score >= 100) {
+          const variants = [
+            `Gelişim potansiyelin yüksek. Şu ana kadar ${score} puan topladın, istikrarlı pratikle zirveye çıkabilirsin.`,
+            `Ortalama bir performansın var (${score} puan), farklı kategorilerde kendini zorlayarak bir üst seviyeye geçebilirsin.`,
+            `Doğru yoldasın! ${score} puana ulaşmışsın, detaylara biraz daha odaklanırsan hatalarını kolayca kapatırsın.`
+          ];
+          analysisText = variants[Math.floor(Math.random() * variants.length)];
+        } else {
+          const variants = [
+            `Henüz yolun başındasın (${score} puan). Her yeni soru senin için bir öğrenme fırsatı, denemekten vazgeçme.`,
+            `Temel becerilerini geliştirmek için harika bir noktadasın, sabırla devam edersen puanların hızla artacaktır.`,
+            `Küçük adımlarla büyük başarılar gelir; mevcut puanını artırmak için sevdiğin kategorilere ağırlık ver.`
+          ];
+          analysisText = variants[Math.floor(Math.random() * variants.length)];
+        }
+      } else {
+        const stats = userStats.performance;
+        const entries = Object.entries(stats);
+        if (entries.length > 0) {
+          const topCategory = entries.sort((a,b) => b[1].total - a[1].total)[0];
+          const categoryName = topCategory[0];
+          const accuracy = Math.round((topCategory[1].correct / topCategory[1].total) * 100);
+          
+          if (accuracy >= 80) {
+            analysisText = `${categoryName} alanındaki bilgin gerçekten etkileyici, neredeyse kusursuz bir performans sergiledin!`;
+          } else if (accuracy >= 50) {
+            analysisText = `${categoryName} kategorisinde fena sayılmazsın, spesifik konularda pratik yapmak seni zirveye taşıyacaktır.`;
+          } else {
+            analysisText = `${categoryName} soruları şu an için zorlamış olabilir, ancak moral bozmadan eksiklerini kapatmaya odaklanabilirsin.`;
+          }
+        } else {
+          analysisText = 'Son performansın hakkında yeterli veri bulunamadı, ancak bol bol pratik yaparak kendini her zaman geliştirebilirsin.';
+        }
+      }
       
-      analysisText = `${categoryName} kategorisindeki performansın %${accuracy} seviyesinde. ${accuracy > 70 ? 'Harika bir iş çıkardın, böyle devam et!' : 'Biraz daha pratik yaparak bu alanda kendini geliştirebilirsin.'}`;
       console.log('Using Fallback Analysis:', analysisText);
     }
 
