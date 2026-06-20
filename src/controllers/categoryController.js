@@ -73,13 +73,25 @@ export const listCategories = async (req, res) => {
 // @access  Admin
 export const deleteCategory = async (req, res) => {
   try {
-    const category = await Category.findByIdAndDelete(req.params.categoryId);
-    if (!category) {
-      return res.status(404).json({ message: 'Kategori bulunamadı' });
-    }
+    const { categoryId } = req.params;
 
-    // Redis ve RabbitMQ'dan sil
-    await redisDataService.deleteCategory(category._id.toString());
+    // Geçerli MongoDB ObjectId mi kontrol et
+    const isValidObjectId = /^[a-f\d]{24}$/i.test(categoryId);
+
+    if (isValidObjectId) {
+      // MongoDB'den sil
+      const category = await Category.findByIdAndDelete(categoryId);
+      if (!category) {
+        // MongoDB'de yoksa Redis'te de temizle ve başarılı say
+        await redisDataService.deleteCategory(categoryId);
+        return res.status(204).send();
+      }
+      // Redis ve RabbitMQ'dan sil
+      await redisDataService.deleteCategory(categoryId);
+    } else {
+      // UUID formatında ID — sadece Redis'ten sil (eski/test verisi)
+      await redisDataService.deleteCategory(categoryId);
+    }
 
     res.status(204).send();
   } catch (error) {
